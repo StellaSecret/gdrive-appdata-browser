@@ -1,0 +1,28 @@
+[application]
+name = "appdata-browser-web"
+default_platform = "web"
+asset_dir = "assets"
+
+# Note: `out_dir` here is unreliable across dioxus-cli versions (in some
+# versions all output goes to target/dx/ regardless of this setting). We
+# pass `--out-dir docs` explicitly to `dx bundle` in CI instead - see
+# .github/workflows/pipeline.yml.
+
+[web.app]
+title = "appDataFolder Browser"
+
+# IMPORTANT for GitHub Pages (project sites, i.e. username.github.io/REPO_NAME):
+# Set this to your repo name so asset paths resolve correctly.
+# If you deploy to a *user* site (username.github.io, repo root), set base_path = "/"
+# base_path = "your-repo-name"
+
+[web.watcher]
+reload_html = true
+watch_path = ["src", "assets", "index.html"]
+
+[web.resource]
+style = []
+script = []
+
+[web.resource.dev]
+script = []

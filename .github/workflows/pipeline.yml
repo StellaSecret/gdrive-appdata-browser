@@ -1,0 +1,189 @@
+name: Pipeline
+
+# Single linear pipeline: unit tests -> build wasm bundle -> e2e smoke
+# tests -> deploy to GitHub Pages. The wasm bundle is built exactly once
+# and that same artifact is reused for both the e2e job and the Pages
+# deployment - no duplicate builds.
+#
+# Deploy only runs for pushes to `main` (PRs stop after the e2e job).
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pipeline-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit-tests:
+    name: Unit tests & lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Check formatting
+        run: cargo fmt -- --check
+
+      - name: Clippy
+        run: cargo clippy --all-targets -- -D warnings
+
+      - name: Run unit tests
+        run: cargo test --verbose
+
+  build:
+    name: Build WASM bundle
+    needs: unit-tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust with wasm32 target
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Install cargo-binstall
+        uses: cargo-bins/cargo-binstall@main
+
+      - name: Install dioxus-cli (prebuilt binary, not compiled from source)
+        # Compiling dioxus-cli from source takes 10+ minutes (large dep
+        # tree: swc, image codecs, git2, TLS, etc). cargo-binstall fetches
+        # the prebuilt release binary instead - this is the install method
+        # Dioxus's own release notes recommend for pinned versions.
+        run: cargo binstall dioxus-cli --version 0.6.3 --no-confirm --locked
+
+      - name: Set base_path for GitHub Pages project site
+        # Applied unconditionally (not just on deploy) so the exact same
+        # artifact that gets smoke-tested is the one that gets deployed.
+        run: |
+          REPO_NAME="${{ github.event.repository.name }}"
+          sed -i "s|^# base_path.*|base_path = \"${REPO_NAME}\"|" Dioxus.toml
+          echo "--- Dioxus.toml ---"
+          cat Dioxus.toml
+
+      - name: Build web bundle (release)
+        # --out-dir is passed explicitly rather than relying on Dioxus.toml's
+        # out_dir, which has been unreliable across dioxus-cli versions.
+        run: dx bundle --platform web --release --out-dir docs
+
+      - name: Verify build output (fail fast with a clear message)
+        # Defensive check: if dx's output location changes again in a future
+        # CLI version, find the real output instead of failing on a missing
+        # `docs/index.html` with no explanation.
+        run: |
+          if [ -f docs/index.html ]; then
+            echo "Found docs/index.html as expected."
+            exit 0
+          fi
+
+          echo "docs/index.html not found - searching target/dx for the real output..."
+          FOUND=$(find target/dx -maxdepth 6 -type f -name index.html -path '*/web/public/*' 2>/dev/null | head -n1)
+
+          if [ -z "$FOUND" ]; then
+            echo "::error::Could not locate built web output anywhere under docs/ or target/dx/. dx bundle output layout may have changed - check 'dx --version' and dx bundle's own logs above."
+            find target/dx -maxdepth 4 2>/dev/null || true
+            exit 1
+          fi
+
+          SRC_DIR=$(dirname "$FOUND")
+          echo "Found build output at $SRC_DIR - copying to docs/"
+          mkdir -p docs
+          cp -r "$SRC_DIR"/* docs/
+
+      - name: Add 404 fallback for client-side routing
+        run: cp docs/index.html docs/404.html
+
+      - name: Upload build artifact (for e2e job)
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-build
+          path: docs/
+          retention-days: 7
+
+      - name: Upload Pages artifact (for deploy job)
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+
+  e2e:
+    name: E2E smoke tests
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: web-build
+          path: docs
+
+      - name: Nest build under its production base_path
+        # Mirrors the /repo-name/ path the site will actually be served
+        # from on GitHub Pages, so the smoke tests exercise the real
+        # deployed asset paths rather than a root-relative approximation.
+        run: |
+          REPO_NAME="${{ github.event.repository.name }}"
+          mkdir -p site_root/"$REPO_NAME"
+          cp -r docs/* site_root/"$REPO_NAME"/
+          echo "SITE_ROOT=$PWD/site_root" >> "$GITHUB_ENV"
+          echo "PW_BASE_URL=http://127.0.0.1:4173/${REPO_NAME}/" >> "$GITHUB_ENV"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install e2e dependencies
+        working-directory: e2e
+        run: npm ci
+
+      - name: Install Playwright browsers
+        working-directory: e2e
+        run: npx playwright install --with-deps chromium
+
+      - name: Run e2e smoke tests
+        working-directory: e2e
+        env:
+          PW_BASE_URL: ${{ env.PW_BASE_URL }}
+          PW_SERVE_DIR: ${{ env.SITE_ROOT }}
+        run: npm test
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: e2e/playwright-report/
+          retention-days: 7
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: e2e
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      # No rebuild here - reuses the Pages artifact uploaded by the
+      # `build` job earlier in this same workflow run.
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

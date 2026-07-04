@@ -1,0 +1,10 @@
+/target
+/docs
+
+# Node / Playwright
+/e2e/node_modules
+/e2e/playwright-report
+/e2e/test-results
+/e2e/.cache
+
+.DS_Store
