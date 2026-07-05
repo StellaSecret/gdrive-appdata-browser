@@ -59,12 +59,23 @@ jobs:
       - name: Install cargo-binstall
         uses: cargo-bins/cargo-binstall@main
 
-      - name: Install dioxus-cli (prebuilt binary, not compiled from source)
-        # Compiling dioxus-cli from source takes 10+ minutes (large dep
-        # tree: swc, image codecs, git2, TLS, etc). cargo-binstall fetches
-        # the prebuilt release binary instead - this is the install method
-        # Dioxus's own release notes recommend for pinned versions.
-        run: cargo binstall dioxus-cli --version 0.6.3 --no-confirm --locked
+      - name: Install dioxus-cli (prebuilt if possible, else compile)
+        # cargo-binstall is much faster when it works (compiling dioxus-cli
+        # from source takes 10+ minutes: swc, image codecs, git2, TLS,
+        # etc). But we verify it actually produced a working `dx` on PATH
+        # before trusting it - if not (e.g. no prebuilt asset available for
+        # this version/platform), fall back to compiling from source
+        # instead of failing the whole pipeline.
+        run: |
+          cargo binstall dioxus-cli --version 0.6.3 --no-confirm --locked || true
+
+          if ! command -v dx >/dev/null 2>&1; then
+            echo "cargo-binstall did not produce a usable 'dx' on PATH - falling back to 'cargo install' (slower, but known to work)."
+            cargo install dioxus-cli --version 0.6.3 --locked
+          fi
+
+          echo "Using dx at: $(command -v dx)"
+          dx --version
 
       - name: Set base_path for GitHub Pages project site
         # Applied unconditionally (not just on deploy) so the exact same
@@ -76,6 +87,14 @@ jobs:
           cat Dioxus.toml
 
       - name: Build web bundle (release)
+        env:
+          # Per-project quick-sign-in presets (see KNOWN_PROJECTS in
+          # src/main.rs). Each is optional: an unset secret resolves to an
+          # empty string, which the app treats as "not configured" and
+          # simply omits that preset button. Add a new project by adding
+          # both a repo secret here and a line in KNOWN_PROJECTS.
+          GOOGLE_WEB_CLIENT_ID_PEOPLEMODELER: ${{ secrets.GOOGLE_WEB_CLIENT_ID_PEOPLEMODELER }}
+          GOOGLE_WEB_CLIENT_ID_ASTHMATRACK: ${{ secrets.GOOGLE_WEB_CLIENT_ID_ASTHMATRACK }}
         # --out-dir is passed explicitly rather than relying on Dioxus.toml's
         # out_dir, which has been unreliable across dioxus-cli versions.
         run: dx bundle --platform web --release --out-dir docs

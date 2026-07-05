@@ -10,6 +10,50 @@ fn main() {
     dioxus::launch(App);
 }
 
+/// Quick-sign-in presets for specific projects you personally control,
+/// baked in at build time from their own individually-named GitHub Actions
+/// secrets (see `.github/workflows/pipeline.yml`). Each entry is
+/// deliberately per-project, not a shared/admin identity - `appDataFolder`
+/// access is scoped per OAuth app, so a preset here only ever unlocks the
+/// one project it belongs to.
+///
+/// To add another: create a new repo secret, add a line here, and wire the
+/// same secret name into the `build` job's env block.
+///
+/// Missing/unset secrets resolve to `Some("")` (GitHub Actions substitutes
+/// an empty string for a `secrets.X` reference that doesn't exist) or
+/// `None` (env var truly absent, e.g. local builds) - `filter_available_presets`
+/// treats both the same way and simply omits that preset's button.
+const KNOWN_PROJECTS: &[(&str, Option<&str>)] = &[
+    (
+        "PeopleModeler",
+        option_env!("GOOGLE_WEB_CLIENT_ID_PEOPLEMODELER"),
+    ),
+    (
+        "AsthmaTrack",
+        option_env!("GOOGLE_WEB_CLIENT_ID_ASTHMATRACK"),
+    ),
+];
+
+fn filter_available_presets(
+    raw: &[(&'static str, Option<&'static str>)],
+) -> Vec<(&'static str, &'static str)> {
+    raw.iter()
+        .filter_map(|(name, id)| id.filter(|s| !s.is_empty()).map(|id| (*name, id)))
+        .collect()
+}
+
+/// Deterministic avatar background color for a preset button, derived from
+/// the project name so the same project always gets the same color.
+fn avatar_color(name: &str) -> String {
+    let hue = name.bytes().map(|b| b as u32).sum::<u32>() % 360;
+    format!("hsl({hue}, 55%, 42%)")
+}
+
+fn avatar_initials(name: &str) -> String {
+    name.chars().take(2).collect::<String>().to_uppercase()
+}
+
 #[component]
 fn App() -> Element {
     let mut client_id = use_signal(|| browser::load_saved_client_id().unwrap_or_default());
@@ -21,12 +65,7 @@ fn App() -> Element {
     let mut revisions: Signal<HashMap<String, Vec<DriveRevision>>> = use_signal(HashMap::new);
     let mut loading_files = use_signal(|| false);
 
-    let do_sign_in = move |_| {
-        let id = client_id.read().trim().to_string();
-        if id.is_empty() {
-            status.set(Some("Enter your Google OAuth Client ID first.".to_string()));
-            return;
-        }
+    let mut begin_sign_in = move |id: String| {
         browser::save_client_id(&id);
         signing_in.set(true);
         status.set(None);
@@ -56,6 +95,17 @@ fn App() -> Element {
         });
     };
 
+    let do_sign_in = move |_| {
+        let id = client_id.read().trim().to_string();
+        if id.is_empty() {
+            status.set(Some("Enter your Google OAuth Client ID first.".to_string()));
+            return;
+        }
+        begin_sign_in(id);
+    };
+
+    let presets = filter_available_presets(KNOWN_PROJECTS);
+
     rsx! {
         style { {include_str!("./style.css")} }
 
@@ -68,6 +118,26 @@ fn App() -> Element {
             main {
                 if access_token.read().is_none() {
                     div { class: "card",
+                        if !presets.is_empty() {
+                            div { class: "presets",
+                                span { class: "muted preset-label", "Quick sign-in:" }
+                                for (name , preset_id) in presets {
+                                    button {
+                                        key: "{name}",
+                                        class: "preset-avatar",
+                                        style: "background: {avatar_color(name)}",
+                                        title: "Sign in with {name}'s Client ID",
+                                        disabled: *signing_in.read(),
+                                        onclick: move |_| {
+                                            client_id.set(preset_id.to_string());
+                                            begin_sign_in(preset_id.to_string());
+                                        },
+                                        "{avatar_initials(name)}"
+                                    }
+                                }
+                            }
+                        }
+
                         label { r#for: "client-id", "Google OAuth Client ID" }
                         input {
                             id: "client-id",
@@ -321,5 +391,56 @@ mod tests {
         assert_eq!(fmt_size(&Some("2048".to_string())), "2.0 KB");
         assert_eq!(fmt_size(&Some("866".to_string())), "866 B");
         assert_eq!(fmt_size(&Some("10240".to_string())), "10.0 KB");
+    }
+
+    #[test]
+    fn filter_available_presets_skips_none() {
+        let raw: &[(&str, Option<&str>)] = &[("NoSecretSet", None)];
+        assert_eq!(filter_available_presets(raw), Vec::<(&str, &str)>::new());
+    }
+
+    #[test]
+    fn filter_available_presets_skips_empty_string() {
+        // GitHub Actions substitutes "" for a secrets.X reference that
+        // doesn't exist in the repo - must be treated the same as None.
+        let raw: &[(&str, Option<&str>)] = &[("UnsetSecret", Some(""))];
+        assert_eq!(filter_available_presets(raw), Vec::<(&str, &str)>::new());
+    }
+
+    #[test]
+    fn filter_available_presets_keeps_configured_ones() {
+        let raw: &[(&str, Option<&str>)] = &[
+            ("PeopleModeler", Some("123.apps.googleusercontent.com")),
+            ("NotConfigured", None),
+            ("AsthmaTrack", Some("456.apps.googleusercontent.com")),
+            ("AlsoUnset", Some("")),
+        ];
+        assert_eq!(
+            filter_available_presets(raw),
+            vec![
+                ("PeopleModeler", "123.apps.googleusercontent.com"),
+                ("AsthmaTrack", "456.apps.googleusercontent.com"),
+            ]
+        );
+    }
+
+    #[test]
+    fn avatar_color_is_deterministic() {
+        assert_eq!(avatar_color("PeopleModeler"), avatar_color("PeopleModeler"));
+    }
+
+    #[test]
+    fn avatar_color_produces_valid_hsl() {
+        let color = avatar_color("AsthmaTrack");
+        assert!(color.starts_with("hsl("));
+        assert!(color.ends_with(", 55%, 42%)"));
+    }
+
+    #[test]
+    fn avatar_initials_takes_first_two_chars_uppercased() {
+        assert_eq!(avatar_initials("PeopleModeler"), "PE");
+        assert_eq!(avatar_initials("AsthmaTrack"), "AS");
+        assert_eq!(avatar_initials("x"), "X");
+        assert_eq!(avatar_initials(""), "");
     }
 }

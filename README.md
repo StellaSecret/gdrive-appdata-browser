@@ -16,7 +16,7 @@ memory for the session.
 > the `wasm32-unknown-unknown` target available (no access to rustup's
 > download servers). The 11 unit tests genuinely run and pass.
 >
-> Two real CI failures were fixed by actually running this on GitHub
+> Three real CI failures were fixed by actually running this on GitHub
 > (things this sandbox couldn't test itself):
 > 1. `Dioxus.toml`'s `out_dir` setting turned out to be unreliable, so
 >    `docs/index.html` never existed. Fixed by passing the CLI flag
@@ -25,6 +25,13 @@ memory for the session.
 >    GitHub issue title rather than the CLI's actual `--help`/error output)
 >    — the real flag is **`--out-dir`**. The CLI's own error message named
 >    the correct flag directly, which is what fixed it.
+> 3. Switching to `cargo-binstall` for a faster `dioxus-cli` install
+>    resulted in `dx: command not found` — the prebuilt-binary path didn't
+>    actually put a working `dx` on `PATH`. Rather than trying to guess why
+>    (another unverifiable assumption), the `build` job now verifies
+>    `command -v dx` after the binstall attempt and falls back to
+>    `cargo install dioxus-cli` (compiling from source) if it's missing —
+>    slower in that case, but that path is proven to work.
 >
 > There's also a defensive fallback step in the `build` job that searches
 > `target/dx/` for the real output if it's ever not where expected, so a
@@ -83,6 +90,85 @@ npm install
 npx playwright install --with-deps chromium
 npm test
 ```
+
+## Quick sign-in presets (optional)
+
+If you personally maintain multiple projects (e.g. PeopleModeler,
+AsthmaTrack), you can add one-click "quick sign-in" avatar buttons for each,
+so you don't have to paste a Client ID in manually every time. This is
+purely a personal convenience layered on top of the manual input — it
+never replaces it, and it degrades gracefully to nothing if unconfigured.
+
+**Important:** `appDataFolder` access is scoped per OAuth app/project —
+there's no single "admin" Client ID that can see everyone's data. Each
+preset is tied to one specific project's own Client ID and only ever
+unlocks that project's own backup data. This is not a way to grant anyone
+broader access; it's just a shortcut for switching between your own
+several projects.
+
+### How it works
+
+- Each preset's Client ID is baked in at **build time** from its own
+  individually-named GitHub Actions secret (e.g.
+  `GOOGLE_WEB_CLIENT_ID_PEOPLEMODELER`). OAuth Client IDs aren't secret —
+  only client *secrets* are — so this is about avoiding hardcoding values
+  in source, not about hiding them; the value ends up plainly visible in
+  the compiled WASM either way, which is expected.
+- If a secret isn't set (e.g. local builds, forked PRs — GitHub withholds
+  repo secrets from fork-triggered workflow runs), that preset's button
+  simply doesn't appear. The manual Client ID field always works
+  regardless.
+
+### Adding a new preset project
+
+1. **Settings → Secrets and variables → Actions → New repository secret**,
+   named `GOOGLE_WEB_CLIENT_ID_<YOURPROJECT>`, value = that project's Web
+   application OAuth Client ID.
+2. In `src/main.rs`, add a line to `KNOWN_PROJECTS`:
+   ```rust
+   const KNOWN_PROJECTS: &[(&str, Option<&str>)] = &[
+       ("PeopleModeler", option_env!("GOOGLE_WEB_CLIENT_ID_PEOPLEMODELER")),
+       ("AsthmaTrack", option_env!("GOOGLE_WEB_CLIENT_ID_ASTHMATRACK")),
+       ("YourProject", option_env!("GOOGLE_WEB_CLIENT_ID_YOURPROJECT")),
+   ];
+   ```
+3. In `.github/workflows/pipeline.yml`, add the matching env var to the
+   `build` job's "Build web bundle (release)" step:
+   ```yaml
+   GOOGLE_WEB_CLIENT_ID_YOURPROJECT: ${{ secrets.GOOGLE_WEB_CLIENT_ID_YOURPROJECT }}
+   ```
+
+### Security notes
+
+Storing a Client ID as a GitHub secret is a hygiene choice (keeps it out of
+tracked source, masked in CI logs), **not** a confidentiality boundary —
+OAuth Client IDs are public identifiers by design and end up plainly
+visible in the compiled WASM/page source regardless of how they're built.
+That's expected and normal for this type of app; it's the same as any
+client-side OAuth integration.
+
+The actual access control that matters lives in Google Cloud Console, on
+each OAuth Client ID itself:
+
+- **Authorized JavaScript origins** — this is the real boundary. Google's
+  servers check the request's `Origin` header server-side before issuing a
+  token, so this list is what actually stops someone else from using your
+  Client ID from a different site. Check it whenever you add a preset or
+  change domains: it should contain only your real GitHub Pages URL(s) and
+  `http://127.0.0.1:8080` for local dev — nothing stale or wildcarded.
+- **OAuth consent screen status** (Testing vs. Published) and its **Test
+  users** list — while in Testing, only allowlisted Google accounts can
+  complete sign-in at all, independent of who can see the Client ID.
+- **Scope** — this app only ever requests `drive.appdata`, which can't
+  touch a user's general Drive files, only the requesting app's own hidden
+  folder. Don't broaden this without a reason.
+- There is **no client secret** anywhere in this architecture (the Web
+  application + Google Identity Services token-client flow is a
+  public-client model by design) — so there's nothing of that kind to leak
+  in the first place.
+- Access tokens are short-lived (~1 hour), held only in browser memory for
+  the session, and never written to `localStorage` — only the Client ID
+  (non-secret) is persisted there.
 
 ## Pre-commit hooks
 
