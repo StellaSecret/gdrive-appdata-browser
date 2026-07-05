@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8"/>
+<title>AsthmeTrack — Icône 512×512</title>
+<style>
+  body { margin: 0; background: #1a1a2e; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; font-family: system-ui; gap: 20px; }
+  .label { color: #6b7280; font-size: 13px; }
+  canvas { border-radius: 24px; }
+
+  /* Instructions export */
+  .instructions { color: #9ca3af; font-size: 12px; text-align: center; max-width: 400px; line-height: 1.6; }
+  .btn { background: #4f9cf9; color: #000; border: none; padding: 10px 24px; border-radius: 8px; font-weight: 700; cursor: pointer; font-size: 14px; }
+</style>
+</head>
+<body>
+
+<div class="label">Icône AsthmeTrack — 512 × 512 px</div>
+
+<canvas id="icon" width="512" height="512"></canvas>
+
+<button class="btn" onclick="downloadIcon()">⬇ Télécharger PNG 512×512</button>
+
+<div class="instructions">
+  Cliquez pour télécharger le PNG.<br/>
+  Importez-le directement dans la Play Console (section "Icône de l'application").
+</div>
+
+<script>
+const canvas = document.getElementById('icon');
+const ctx = canvas.getContext('2d');
+const W = 512, H = 512;
+
+function draw() {
+  // ── Fond avec dégradé ──
+  const bgGrad = ctx.createLinearGradient(0, 0, W, H);
+  bgGrad.addColorStop(0, '#0d1b2a');
+  bgGrad.addColorStop(1, '#0a1628');
+  ctx.fillStyle = bgGrad;
+  ctx.roundRect(0, 0, W, H, 80);
+  ctx.fill();
+
+  // ── Halo de fond ──
+  const halo = ctx.createRadialGradient(256, 220, 20, 256, 220, 240);
+  halo.addColorStop(0, 'rgba(79,156,249,0.15)');
+  halo.addColorStop(1, 'rgba(79,156,249,0)');
+  ctx.fillStyle = halo;
+  ctx.fillRect(0, 0, W, H);
+
+  // ── Courbe de spirométrie (ligne DEP) ──
+  ctx.save();
+  ctx.beginPath();
+
+  // Courbe stylisée ressemblant à un débit expiratoire
+  const pts = [
+    [80, 310],
+    [120, 300],
+    [160, 240],
+    [195, 145],  // pic DEP
+    [225, 175],
+    [255, 210],
+    [290, 230],
+    [330, 248],
+    [380, 258],
+    [430, 262],
+  ];
+
+  ctx.moveTo(pts[0][0], pts[0][1]);
+  for (let i = 0; i < pts.length - 1; i++) {
+    const mx = (pts[i][0] + pts[i+1][0]) / 2;
+    const my = (pts[i][1] + pts[i+1][1]) / 2;
+    ctx.quadraticCurveTo(pts[i][0], pts[i][1], mx, my);
+  }
+  ctx.lineTo(pts[pts.length-1][0], pts[pts.length-1][1]);
+
+  // Remplissage sous la courbe
+  ctx.lineTo(430, 330);
+  ctx.lineTo(80, 330);
+  ctx.closePath();
+
+  const fillGrad = ctx.createLinearGradient(0, 140, 0, 330);
+  fillGrad.addColorStop(0, 'rgba(79,156,249,0.35)');
+  fillGrad.addColorStop(1, 'rgba(79,156,249,0.02)');
+  ctx.fillStyle = fillGrad;
+  ctx.fill();
+  ctx.restore();
+
+  // Ligne principale
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(pts[0][0], pts[0][1]);
+  for (let i = 0; i < pts.length - 1; i++) {
+    const mx = (pts[i][0] + pts[i+1][0]) / 2;
+    const my = (pts[i][1] + pts[i+1][1]) / 2;
+    ctx.quadraticCurveTo(pts[i][0], pts[i][1], mx, my);
+  }
+  ctx.lineTo(pts[pts.length-1][0], pts[pts.length-1][1]);
+  ctx.strokeStyle = '#4f9cf9';
+  ctx.lineWidth = 5;
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+  ctx.stroke();
+  ctx.restore();
+
+  // ── Point pic DEP avec halo ──
+  const peakX = 195, peakY = 145;
+
+  // Halo externe
+  const peakHalo = ctx.createRadialGradient(peakX, peakY, 2, peakX, peakY, 28);
+  peakHalo.addColorStop(0, 'rgba(16,217,160,0.5)');
+  peakHalo.addColorStop(1, 'rgba(16,217,160,0)');
+  ctx.fillStyle = peakHalo;
+  ctx.beginPath();
+  ctx.arc(peakX, peakY, 28, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Point
+  ctx.beginPath();
+  ctx.arc(peakX, peakY, 8, 0, Math.PI * 2);
+  ctx.fillStyle = '#10d9a0';
+  ctx.fill();
+  ctx.strokeStyle = '#fff';
+  ctx.lineWidth = 2.5;
+  ctx.stroke();
+
+  // ── Ligne SpO₂ (verte, en pointillé subtil) ──
+  ctx.save();
+  ctx.setLineDash([6, 8]);
+  ctx.beginPath();
+  ctx.moveTo(80, 285);
+  const spo2pts = [[80,285],[140,278],[200,272],[260,268],[320,266],[380,265],[430,265]];
+  spo2pts.forEach((p, i) => {
+    if(i===0) ctx.moveTo(p[0], p[1]);
+    else ctx.lineTo(p[0], p[1]);
+  });
+  ctx.strokeStyle = 'rgba(16,217,160,0.5)';
+  ctx.lineWidth = 3;
+  ctx.stroke();
+  ctx.restore();
+
+  // ── Texte "AT" monogramme ──
+  ctx.save();
+  ctx.font = '900 72px "Arial Black", Arial';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+
+  // Dégradé texte
+  const textGrad = ctx.createLinearGradient(210, 390, 300, 440);
+  textGrad.addColorStop(0, '#4f9cf9');
+  textGrad.addColorStop(1, '#10d9a0');
+  ctx.fillStyle = textGrad;
+  ctx.fillText('AT', 256, 418);
+  ctx.restore();
+
+  // ── Ligne décorative sous le texte ──
+  const lineGrad = ctx.createLinearGradient(176, 0, 336, 0);
+  lineGrad.addColorStop(0, 'rgba(79,156,249,0)');
+  lineGrad.addColorStop(0.5, '#4f9cf9');
+  lineGrad.addColorStop(1, 'rgba(79,156,249,0)');
+  ctx.strokeStyle = lineGrad;
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(176, 448);
+  ctx.lineTo(336, 448);
+  ctx.stroke();
+
+  // ── Petits points décoratifs (bruit de fond) ──
+  ctx.fillStyle = 'rgba(79,156,249,0.15)';
+  [[440, 80], [60, 180], [470, 380], [50, 420]].forEach(([x, y]) => {
+    ctx.beginPath();
+    ctx.arc(x, y, 3, 0, Math.PI * 2);
+    ctx.fill();
+  });
+}
+
+draw();
+
+function downloadIcon() {
+  const a = document.createElement('a');
+  a.download = 'asthmetrack-icon-512.png';
+  a.href = canvas.toDataURL('image/png');
+  a.click();
+}
+</script>
+</body>
+</html>

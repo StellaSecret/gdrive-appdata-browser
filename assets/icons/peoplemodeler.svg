@@ -1,0 +1,37 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <rect width="512" height="512" rx="96" fill="#0d1117"/>
+
+  <!-- Sparse grid -->
+  <g stroke="#e74c3c" stroke-width="1.2" opacity="0.35">
+    <line x1="0" y1="128" x2="512" y2="128"/>
+    <line x1="0" y1="256" x2="512" y2="256"/>
+    <line x1="0" y1="384" x2="512" y2="384"/>
+    <line x1="128" y1="0" x2="128" y2="512"/>
+    <line x1="256" y1="0" x2="256" y2="512"/>
+    <line x1="384" y1="0" x2="384" y2="512"/>
+  </g>
+
+  <!-- Connector lines -->
+  <line x1="256" y1="198" x2="256" y2="128" stroke="#1abc9c" stroke-width="6" stroke-linecap="round"/>
+  <line x1="228" y1="276" x2="164" y2="340" stroke="#e67e22" stroke-width="6" stroke-linecap="round"/>
+  <line x1="284" y1="276" x2="348" y2="340" stroke="#e74c3c" stroke-width="6" stroke-linecap="round"/>
+
+  <!-- Center node -->
+  <circle cx="256" cy="240" r="58" fill="#0d1117" stroke="white" stroke-width="7"/>
+  <!-- Person head -->
+  <circle cx="256" cy="222" r="16" fill="white"/>
+  <!-- Person body -->
+  <path d="M222 268 Q256 252 290 268" fill="white" stroke="none"/>
+
+  <!-- Top satellite -->
+  <circle cx="256" cy="104" r="26" fill="#0d1117" stroke="#1abc9c" stroke-width="5.5"/>
+  <circle cx="256" cy="104" r="10" fill="#1abc9c"/>
+
+  <!-- Bottom-left satellite -->
+  <circle cx="140" cy="364" r="26" fill="#0d1117" stroke="#e67e22" stroke-width="5.5"/>
+  <circle cx="140" cy="364" r="10" fill="#e67e22"/>
+
+  <!-- Bottom-right satellite -->
+  <circle cx="372" cy="364" r="26" fill="#0d1117" stroke="#e74c3c" stroke-width="5.5"/>
+  <circle cx="372" cy="364" r="10" fill="#e74c3c"/>
+</svg>

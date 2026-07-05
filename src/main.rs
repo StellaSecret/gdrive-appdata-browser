@@ -35,6 +35,20 @@ const KNOWN_PROJECTS: &[(&str, Option<&str>)] = &[
     ),
 ];
 
+// Preset icons, bundled via Dioxus's asset! macro (see
+// assets/icons/README.md for provenance). Optional: a preset without a
+// matching entry here just falls back to the colored-initials badge.
+const PEOPLEMODELER_ICON: Asset = asset!("/assets/icons/peoplemodeler.svg");
+const ASTHMATRACK_ICON: Asset = asset!("/assets/icons/asthmatrack.png");
+
+fn preset_icon(name: &str) -> Option<Asset> {
+    match name {
+        "PeopleModeler" => Some(PEOPLEMODELER_ICON),
+        "AsthmaTrack" => Some(ASTHMATRACK_ICON),
+        _ => None,
+    }
+}
+
 fn filter_available_presets(
     raw: &[(&'static str, Option<&'static str>)],
 ) -> Vec<(&'static str, &'static str)> {
@@ -44,7 +58,8 @@ fn filter_available_presets(
 }
 
 /// Deterministic avatar background color for a preset button, derived from
-/// the project name so the same project always gets the same color.
+/// the project name so the same project always gets the same color. Used
+/// as the fallback badge for any preset without a dedicated icon asset.
 fn avatar_color(name: &str) -> String {
     let hue = name.bytes().map(|b| b as u32).sum::<u32>() % 360;
     format!("hsl({hue}, 55%, 42%)")
@@ -125,14 +140,18 @@ fn App() -> Element {
                                     button {
                                         key: "{name}",
                                         class: "preset-avatar",
-                                        style: "background: {avatar_color(name)}",
+                                        style: if preset_icon(name).is_none() { "background: {avatar_color(name)}" },
                                         title: "Sign in with {name}'s Client ID",
                                         disabled: *signing_in.read(),
                                         onclick: move |_| {
                                             client_id.set(preset_id.to_string());
                                             begin_sign_in(preset_id.to_string());
                                         },
-                                        "{avatar_initials(name)}"
+                                        if let Some(icon) = preset_icon(name) {
+                                            img { class: "preset-icon-img", src: "{icon}", alt: "{name}" }
+                                        } else {
+                                            "{avatar_initials(name)}"
+                                        }
                                     }
                                 }
                             }
