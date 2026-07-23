@@ -95,6 +95,7 @@ jobs:
           # both a repo secret here and a line in KNOWN_PROJECTS.
           GOOGLE_WEB_CLIENT_ID_PEOPLEMODELER: ${{ secrets.GOOGLE_WEB_CLIENT_ID_PEOPLEMODELER }}
           GOOGLE_WEB_CLIENT_ID_ASTHMATRACK: ${{ secrets.GOOGLE_WEB_CLIENT_ID_ASTHMATRACK }}
+          GOOGLE_WEB_CLIENT_ID_CVGENERATOR: ${{ secrets.GOOGLE_WEB_CLIENT_ID_CVGENERATOR }}
         # --out-dir is passed explicitly rather than relying on Dioxus.toml's
         # out_dir, which has been unreliable across dioxus-cli versions.
         run: dx bundle --platform web --release --out-dir docs

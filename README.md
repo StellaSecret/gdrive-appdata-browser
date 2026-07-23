@@ -94,7 +94,7 @@ npm test
 ## Quick sign-in presets (optional)
 
 If you personally maintain multiple projects (e.g. PeopleModeler,
-AsthmaTrack), you can add one-click "quick sign-in" avatar buttons for each,
+AsthmaTrack, CVGenerator), you can add one-click "quick sign-in" avatar buttons for each,
 so you don't have to paste a Client ID in manually every time. This is
 purely a personal convenience layered on top of the manual input — it
 never replaces it, and it degrades gracefully to nothing if unconfigured.

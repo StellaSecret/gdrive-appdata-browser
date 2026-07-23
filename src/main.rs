@@ -33,6 +33,10 @@ const KNOWN_PROJECTS: &[(&str, Option<&str>)] = &[
         "AsthmaTrack",
         option_env!("GOOGLE_WEB_CLIENT_ID_ASTHMATRACK"),
     ),
+    (
+        "CVGenerator",
+        option_env!("GOOGLE_WEB_CLIENT_ID_CVGENERATOR"),
+    ),
 ];
 
 // Preset icons, bundled via Dioxus's asset! macro (see
@@ -40,11 +44,13 @@ const KNOWN_PROJECTS: &[(&str, Option<&str>)] = &[
 // matching entry here just falls back to the colored-initials badge.
 const PEOPLEMODELER_ICON: Asset = asset!("/assets/icons/peoplemodeler.svg");
 const ASTHMATRACK_ICON: Asset = asset!("/assets/icons/asthmatrack.png");
+const CVGENERATOR_ICON: Asset = asset!("/assets/icons/cvgenerator.svg");
 
 fn preset_icon(name: &str) -> Option<Asset> {
     match name {
         "PeopleModeler" => Some(PEOPLEMODELER_ICON),
         "AsthmaTrack" => Some(ASTHMATRACK_ICON),
+        "CVGenerator" => Some(CVGENERATOR_ICON),
         _ => None,
     }
 }
