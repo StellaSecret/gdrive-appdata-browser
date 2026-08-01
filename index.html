@@ -5,10 +5,26 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>appDataFolder Browser</title>
 
+  <!-- Content-Security-Policy: this page holds a live OAuth access token in
+       memory, so we scope script/connect sources to exactly what the app
+       needs (GIS's script + popup, and the Drive/Google APIs) rather than
+       leaving the default wide open. GitHub Pages can't set this as a real
+       HTTP header, so a meta tag is the best available option here - it
+       still blocks unexpected script/connect origins, though note that
+       frame-ancestors and a couple of other directives are ignored when
+       delivered this way (they require the HTTP header form). -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://accounts.google.com 'sha256-IztjgCb5M5ogW8Jao2xe4V/vQvHBTr3Hg6PADEbydlk='; connect-src 'self' https://www.googleapis.com https://accounts.google.com https://oauth2.googleapis.com; frame-src https://accounts.google.com; img-src 'self' data:; style-src 'self' 'unsafe-inline'; base-uri 'none'; form-action 'none'; object-src 'none';"> <!-- pragma: allowlist secret (sha256 hash of the public inline script below, not a credential) -->
+
   <!-- Google Identity Services: provides the browser-native OAuth popup flow.
        No client_secret is ever needed with this library. -->
   <script src="https://accounts.google.com/gsi/client" async defer></script>
 
+  <!-- NOTE: the CSP above allow-lists this exact script via a sha256 hash
+       (script-src 'sha256-...') instead of 'unsafe-inline', so an XSS
+       payload can't just add its own <script> tag. If you edit the JS
+       below, recompute the hash (e.g. `openssl dgst -sha256 -binary <<< "$SCRIPT_TEXT" | openssl base64`
+       using the exact text between <script> and </script>) and update the
+       CSP meta tag above, or sign-in will silently stop working. -->
   <script>
     // Thin JS bridge called from Rust/WASM via wasm-bindgen.
     // Wraps Google Identity Services' token client in a Promise so the

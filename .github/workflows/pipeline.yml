@@ -42,6 +42,14 @@ jobs:
       - name: Run unit tests
         run: cargo test --verbose
 
+      - name: Install cargo-audit
+        uses: cargo-bins/cargo-binstall@main
+
+      - name: Audit dependencies for known vulnerabilities
+        run: |
+          cargo binstall cargo-audit --no-confirm --locked
+          cargo audit
+
   build:
     name: Build WASM bundle
     needs: unit-tests
