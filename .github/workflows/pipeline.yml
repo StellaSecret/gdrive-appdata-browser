@@ -154,7 +154,7 @@ jobs:
           retention-days: 7
 
       - name: Upload Pages artifact (for deploy job)
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v5
         with:
           path: docs
 
