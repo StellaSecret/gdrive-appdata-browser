@@ -162,6 +162,8 @@ jobs:
     name: E2E smoke tests
     needs: build
     runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.62.0-noble
     steps:
       - uses: actions/checkout@v7
 
@@ -182,17 +184,9 @@ jobs:
           echo "SITE_ROOT=$PWD/site_root" >> "$GITHUB_ENV"
           echo "PW_BASE_URL=http://127.0.0.1:4173/${REPO_NAME}/" >> "$GITHUB_ENV"
 
-      - uses: actions/setup-node@v7
-        with:
-          node-version: "20"
-
       - name: Install e2e dependencies
         working-directory: e2e
         run: npm ci
-
-      - name: Install Playwright browsers
-        working-directory: e2e
-        run: npx playwright install --with-deps chromium
 
       - name: Run e2e smoke tests
         working-directory: e2e
