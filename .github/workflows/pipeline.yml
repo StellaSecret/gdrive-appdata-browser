@@ -147,7 +147,7 @@ jobs:
         run: cp docs/index.html docs/404.html
 
       - name: Upload build artifact (for e2e job)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: web-build
           path: docs/
@@ -203,7 +203,7 @@ jobs:
 
       - name: Upload Playwright report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-report
           path: e2e/playwright-report/
