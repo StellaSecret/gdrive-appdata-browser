@@ -5,6 +5,23 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>appDataFolder Browser</title>
 
+  <!-- Content-Security-Policy: this page holds a live OAuth access token in
+       memory, so connect-src is scoped to exactly the Google APIs this app
+       talks to (the directive that matters most for a page holding a live
+       token - it stops the token from ever being sent anywhere else).
+       script-src is intentionally looser ('unsafe-inline' included): Dioxus's
+       own build injects an inline WASM bootstrap <script> whose exact
+       content isn't stable across dx/dioxus-cli versions, so a sha256-hash
+       allowlist here is too fragile (it broke sign-in entirely the first
+       time - the whole app failed to boot). script-src 'self' plus the GIS
+       origin still blocks an attacker's injected <script src="https://evil...">
+       tag pointing at a third-party domain, which is the more likely XSS
+       payload shape anyway. GitHub Pages can't set this as a real HTTP
+       header, so a meta tag is the best available option here - note that
+       frame-ancestors and a couple of other directives are ignored when
+       delivered this way (they require the HTTP header form). -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://accounts.google.com; connect-src 'self' https://www.googleapis.com https://accounts.google.com https://oauth2.googleapis.com; frame-src https://accounts.google.com; img-src 'self' data:; style-src 'self' 'unsafe-inline'; base-uri 'none'; form-action 'none'; object-src 'none';">
+
   <!-- Google Identity Services: provides the browser-native OAuth popup flow.
        No client_secret is ever needed with this library. -->
   <script src="https://accounts.google.com/gsi/client" async defer></script>

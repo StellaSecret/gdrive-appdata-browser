@@ -42,6 +42,25 @@ jobs:
       - name: Run unit tests
         run: cargo test --verbose
 
+      - name: Install cargo-audit
+        uses: cargo-bins/cargo-binstall@main
+
+      - name: Audit dependencies for known vulnerabilities
+        # cargo-binstall can report "already installed" (e.g. when
+        # Swatinem/rust-cache restores ~/.cargo's install receipts from
+        # cache without the actual binary) and skip installing anything -
+        # so verify `cargo audit` actually works before trusting it, same
+        # defensive pattern as the dioxus-cli install in the build job below.
+        run: |
+          cargo binstall cargo-audit --no-confirm --locked
+
+          if ! cargo audit --version >/dev/null 2>&1; then
+            echo "cargo-binstall's cargo-audit isn't actually runnable - forcing a reinstall."
+            cargo binstall cargo-audit --no-confirm --locked --force || cargo install cargo-audit --locked
+          fi
+
+          cargo audit
+
   build:
     name: Build WASM bundle
     needs: unit-tests
