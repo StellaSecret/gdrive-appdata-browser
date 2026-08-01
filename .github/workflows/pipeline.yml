@@ -182,7 +182,7 @@ jobs:
           echo "SITE_ROOT=$PWD/site_root" >> "$GITHUB_ENV"
           echo "PW_BASE_URL=http://127.0.0.1:4173/${REPO_NAME}/" >> "$GITHUB_ENV"
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: "20"
 
