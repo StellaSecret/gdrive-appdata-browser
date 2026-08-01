@@ -78,6 +78,14 @@ jobs:
       - name: Install cargo-binstall
         uses: cargo-bins/cargo-binstall@main
 
+      # IMPORTANT: keep this version aligned with the `dioxus` (and
+      # therefore `manganis`) version in Cargo.toml/Cargo.lock. `dx bundle`
+      # reads a linker-embedded asset manifest that manganis writes at
+      # compile time; if the CLI's manganis/cli-opt version doesn't match
+      # the library version used to build the crate, asset bundling can
+      # silently mis-link files (e.g. the preset sign-in icons rendering
+      # as broken images) without failing the build outright. Check
+      # `grep -A1 'name = "dioxus"' Cargo.lock` for the version to match.
       - name: Install dioxus-cli (prebuilt if possible, else compile)
         # cargo-binstall is much faster when it works (compiling dioxus-cli
         # from source takes 10+ minutes: swc, image codecs, git2, TLS,
@@ -86,11 +94,11 @@ jobs:
         # this version/platform), fall back to compiling from source
         # instead of failing the whole pipeline.
         run: |
-          cargo binstall dioxus-cli --version 0.6.3 --no-confirm --locked || true
+          cargo binstall dioxus-cli --version 0.7.9 --no-confirm --locked || true
 
           if ! command -v dx >/dev/null 2>&1; then
             echo "cargo-binstall did not produce a usable 'dx' on PATH - falling back to 'cargo install' (slower, but known to work)."
-            cargo install dioxus-cli --version 0.6.3 --locked
+            cargo install dioxus-cli --version 0.7.9 --locked
           fi
 
           echo "Using dx at: $(command -v dx)"
