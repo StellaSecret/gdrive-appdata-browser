@@ -206,6 +206,7 @@ fn App() -> Element {
                     } else {
                         for file in files.read().iter().cloned() {
                             FileCard {
+                                key: "{file.id}",
                                 file: file.clone(),
                                 token: access_token.read().clone().unwrap_or_default(),
                                 revisions,
@@ -282,6 +283,7 @@ fn FileCard(
                     tbody {
                         for rev in revs.iter().cloned() {
                             RevisionRow {
+                                key: "{rev.id}",
                                 file_id: file.id.clone(),
                                 revision: rev,
                                 token: token.clone(),
