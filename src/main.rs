@@ -4,7 +4,7 @@ mod gis;
 
 use dioxus::prelude::*;
 use drive::{DriveFile, DriveRevision};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 fn main() {
     dioxus::launch(App);
@@ -228,6 +228,9 @@ fn FileCard(
     let file_id = file.id.clone();
     let mut loading = use_signal(|| true);
     let mut error = use_signal(|| None::<String>);
+    let mut selected: Signal<HashSet<String>> = use_signal(HashSet::new);
+    let mut bulk_busy = use_signal(|| false);
+    let mut bulk_error = use_signal(|| None::<String>);
 
     {
         let file_id = file_id.clone();
@@ -251,6 +254,68 @@ fn FileCard(
     }
 
     let revs = revisions.read().get(&file.id).cloned().unwrap_or_default();
+    let selected_count = selected.read().len();
+    let all_selected = !revs.is_empty() && selected_count == revs.len();
+
+    let toggle_select_all = {
+        let revs = revs.clone();
+        move |_| {
+            if all_selected {
+                selected.write().clear();
+            } else {
+                selected.write().extend(revs.iter().map(|r| r.id.clone()));
+            }
+        }
+    };
+
+    let delete_selected = {
+        let file_id = file_id.clone();
+        let token = token.clone();
+        move |_| {
+            let ids: Vec<String> = selected.read().iter().cloned().collect();
+            if ids.is_empty() {
+                return;
+            }
+            let prompt = if ids.len() == 1 {
+                "Permanently delete 1 selected revision? This cannot be undone.".to_string()
+            } else {
+                format!(
+                    "Permanently delete {} selected revisions? This cannot be undone.",
+                    ids.len()
+                )
+            };
+            if !browser::confirm(&prompt) {
+                return;
+            }
+
+            let file_id = file_id.clone();
+            let token = token.clone();
+            bulk_busy.set(true);
+            bulk_error.set(None);
+            spawn(async move {
+                let mut failures = Vec::new();
+                for rev_id in ids {
+                    match drive::delete_revision(&token, &file_id, &rev_id).await {
+                        Ok(()) => {
+                            if let Some(list) = revisions.write().get_mut(&file_id) {
+                                list.retain(|r| r.id != rev_id);
+                            }
+                            selected.write().remove(&rev_id);
+                        }
+                        Err(e) => failures.push(format!("{rev_id}: {e}")),
+                    }
+                }
+                if !failures.is_empty() {
+                    bulk_error.set(Some(format!(
+                        "{} of the selected revisions failed to delete:\n{}",
+                        failures.len(),
+                        failures.join("\n")
+                    )));
+                }
+                bulk_busy.set(false);
+            });
+        }
+    };
 
     rsx! {
         div { class: "file-card",
@@ -271,9 +336,39 @@ fn FileCard(
             } else if revs.is_empty() {
                 div { class: "empty", "No revisions available." }
             } else {
+                div { class: "bulk-toolbar",
+                    span { class: "muted",
+                        if selected_count == 0 {
+                            "Select revisions to delete in bulk"
+                        } else {
+                            "{selected_count} selected"
+                        }
+                    }
+                    button {
+                        class: "danger",
+                        disabled: selected_count == 0 || *bulk_busy.read(),
+                        onclick: delete_selected,
+                        if *bulk_busy.read() {
+                            "Deleting…"
+                        } else {
+                            "Delete selected"
+                        }
+                    }
+                }
+                if let Some(err) = bulk_error.read().clone() {
+                    div { class: "error small", "{err}" }
+                }
                 table {
                     thead {
                         tr {
+                            th {
+                                input {
+                                    r#type: "checkbox",
+                                    checked: all_selected,
+                                    disabled: *bulk_busy.read(),
+                                    onchange: toggle_select_all,
+                                }
+                            }
                             th { "Revision ID" }
                             th { "Modified" }
                             th { "Size" }
@@ -288,6 +383,8 @@ fn FileCard(
                                 revision: rev,
                                 token: token.clone(),
                                 revisions,
+                                selected,
+                                bulk_busy: *bulk_busy.read(),
                             }
                         }
                     }
@@ -303,11 +400,27 @@ fn RevisionRow(
     revision: DriveRevision,
     token: String,
     revisions: Signal<HashMap<String, Vec<DriveRevision>>>,
+    selected: Signal<HashSet<String>>,
+    bulk_busy: bool,
 ) -> Element {
     let mut busy = use_signal(|| false);
     let mut row_error = use_signal(|| None::<String>);
 
     let rev_id = revision.revision_id_or_id();
+    let is_selected = selected.read().contains(&rev_id);
+    let row_disabled = *busy.read() || bulk_busy;
+
+    let toggle_selected = {
+        let rev_id = rev_id.clone();
+        move |_| {
+            let mut sel = selected.write();
+            if sel.contains(&rev_id) {
+                sel.remove(&rev_id);
+            } else {
+                sel.insert(rev_id.clone());
+            }
+        }
+    };
 
     let download = {
         let file_id = file_id.clone();
@@ -346,6 +459,7 @@ fn RevisionRow(
                         if let Some(list) = revisions.write().get_mut(&file_id) {
                             list.retain(|r| r.id != rev_id);
                         }
+                        selected.write().remove(&rev_id);
                     }
                     Err(e) => {
                         row_error.set(Some(e));
@@ -358,14 +472,22 @@ fn RevisionRow(
 
     rsx! {
         tr {
+            td {
+                input {
+                    r#type: "checkbox",
+                    checked: is_selected,
+                    disabled: row_disabled,
+                    onchange: toggle_selected,
+                }
+            }
             td { class: "rev-id", "{revision.id}" }
             td { "{revision.modified_time.clone().unwrap_or_default()}" }
             td { "{fmt_size(&revision.size)}" }
             td { class: "actions",
-                button { onclick: download, "Download" }
+                button { disabled: row_disabled, onclick: download, "Download" }
                 button {
                     class: "danger",
-                    disabled: *busy.read(),
+                    disabled: row_disabled,
                     onclick: delete,
                     if *busy.read() { "Deleting…" } else { "Delete" }
                 }

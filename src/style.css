@@ -102,6 +102,16 @@ th { color: var(--muted); font-weight: 500; border-bottom: 1px solid var(--borde
 tr:not(:last-child) td { border-bottom: 1px solid var(--border); }
 .rev-id { font-family: monospace; font-size: 11px; color: var(--muted); word-break: break-all; }
 .actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.bulk-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--border);
+  gap: 12px;
+}
+th input[type="checkbox"], td input[type="checkbox"] { cursor: pointer; }
+th input[type="checkbox"]:disabled, td input[type="checkbox"]:disabled { cursor: not-allowed; }
 .empty, .error { padding: 24px 20px; text-align: center; color: var(--muted); }
 .error { color: var(--danger); }
-.error.small { padding: 4px 0; font-size: 12px; width: 100%; }
+.error.small { padding: 4px 0; font-size: 12px; width: 100%; white-space: pre-line; }
