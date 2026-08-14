@@ -148,6 +148,7 @@ fn App() -> Element {
                                         class: "preset-avatar",
                                         style: if preset_icon(name).is_none() { "background: {avatar_color(name)}" },
                                         title: "Sign in with {name}'s Client ID",
+                                        "aria-label": "Sign in with {name}'s Client ID",
                                         disabled: *signing_in.read(),
                                         onclick: move |_| {
                                             client_id.set(preset_id.to_string());

@@ -49,4 +49,33 @@ test.describe('appDataFolder Browser - smoke tests', () => {
       '999999999-persisted.apps.googleusercontent.com'
     );
   });
+
+  test('preset quick-sign-in buttons (if configured) are accessible and well-formed', async ({
+    page,
+  }) => {
+    // Deliberately does NOT assume a fixed number of presets: whether any
+    // of the GOOGLE_WEB_CLIENT_ID_* secrets are set depends on which
+    // environment built this artifact (local/fork builds have none; a
+    // real deploy may have all three), and that can change over time as
+    // secrets get added. Instead this asserts the invariant that holds
+    // either way - if presets exist, each one must be a real, accessible
+    // button, not just decoration.
+    await page.goto('./');
+    const presetButtons = page.locator('.preset-avatar');
+    const count = await presetButtons.count();
+
+    if (count === 0) {
+      // No presets configured in this build - the manual Client ID field
+      // (covered by the other tests above) is the only path, and the
+      // "Quick sign-in" group shouldn't render at all in that case.
+      await expect(page.locator('.presets')).toHaveCount(0);
+      return;
+    }
+
+    await expect(page.getByText('Quick sign-in:')).toBeVisible();
+    for (let i = 0; i < count; i++) {
+      const ariaLabel = await presetButtons.nth(i).getAttribute('aria-label');
+      expect(ariaLabel).toMatch(/^Sign in with .+'s Client ID$/);
+    }
+  });
 });

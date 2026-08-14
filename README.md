@@ -43,10 +43,10 @@ memory for the session.
 This repo ships with a single linear pipeline: **`.github/workflows/pipeline.yml`**
 
 ```
-unit tests & lint  →  build wasm bundle  →  e2e smoke tests  →  deploy to Pages
+unit tests & lint  →  build wasm bundle  →  e2e smoke tests  →  deploy to Pages  →  post-deploy check
 ```
 
-- **`unit-tests`**: `cargo fmt --check`, `cargo clippy -D warnings`, `cargo test`
+- **`unit-tests`**: `cargo fmt --check`, `cargo clippy -D warnings`, `cargo test`, `cargo audit`
 - **`build`**: installs the wasm32 target, installs `dioxus-cli` via
   `cargo-binstall` (prebuilt binary — compiling it from source takes 10+
   minutes due to its dependency tree), runs
@@ -56,9 +56,17 @@ unit tests & lint  →  build wasm bundle  →  e2e smoke tests  →  deploy to 
 - **`e2e`**: downloads the build, nests it under its production
   `/repo-name/` path locally (so the smoke tests hit the exact asset paths
   that will be live on Pages), and runs Playwright against it headlessly.
-- **`deploy`**: only runs on pushes to `main` (PRs stop after `e2e`).
-  Reuses the artifact already uploaded by `build` — no rebuild — and
-  publishes via `actions/deploy-pages`.
+- **`deploy`**: runs on pushes to `main`, or a manual `workflow_dispatch`
+  run on `main` (useful for re-deploying without an empty commit — e.g. if
+  Pages itself had a transient issue). PRs stop after `e2e`. Reuses the
+  artifact already uploaded by `build` — no rebuild — and publishes via
+  `actions/deploy-pages`.
+- **`post-deploy-check`**: after `deploy` reports success, actually curls
+  the live Pages URL (with retries, since CDN propagation can lag a few
+  seconds) and checks the response is a real `200` containing the app's
+  title — not just that the deploy step didn't error. Catches the class of
+  bug we've hit before (wrong `base_path`, build landing in an unexpected
+  place) automatically instead of via manual discovery after the fact.
 
 To enable deployment: **Settings → Pages → Source → GitHub Actions**.
 
@@ -170,6 +178,29 @@ each OAuth Client ID itself:
   the session, and never written to `localStorage` — only the Client ID
   (non-secret) is persisted there.
 
+**CI supply-chain hardening:**
+
+- `cargo-bins/cargo-binstall`'s own docs recommend `uses:
+  cargo-bins/cargo-binstall@main` — but this repo pins it to a specific,
+  verified full commit SHA instead (with the release tag noted in a
+  comment), since floating action refs mean trusting that the upstream
+  repo is never compromised between runs. This trades zero-maintenance for
+  immutability; bumping it means manually verifying and updating the SHA.
+- `rust-toolchain.toml` pins an exact Rust version for local `rustup`-based
+  development. **Note:** `dtolnay/rust-toolchain` (used in CI) does not
+  read this file itself, so the workflow's own `dtolnay/rust-toolchain@1.91.0`
+  pin is what actually controls CI's compiler version — kept in sync with
+  `rust-toolchain.toml` manually. (An earlier version of this pipeline used
+  `@stable` here, which would install latest-stable and then rely on
+  rustup's own directory-based override to silently switch to 1.91.0 on
+  the first `cargo` call because of the toml file — same end result, but
+  wasteful and non-obvious. Fixed to be explicit.)
+- `cargo audit` (in `unit-tests`) checks dependencies against the
+  RustSec advisory database on every run.
+- Dependabot (`.github/dependabot.yml`) keeps `cargo`, the `e2e/` npm
+  packages, and the GitHub Actions themselves current, grouped by
+  minor/patch so routine bumps don't create a PR per dependency.
+
 ## Pre-commit hooks
 
 This repo uses [pre-commit](https://pre-commit.com) to catch issues before
@@ -225,20 +256,24 @@ detect-secrets scan > .secrets.baseline
 ## 2. Local setup
 
 You need:
-- Rust + the `wasm32-unknown-unknown` target:
+- Rust + the `wasm32-unknown-unknown` target. `rust-toolchain.toml` pins
+  the exact version this repo is tested with, so if you use `rustup`,
+  running any `cargo`/`rustc` command in this directory will auto-install
+  and switch to the right version (including the wasm32 target and
+  clippy/rustfmt) automatically — no manual `rustup target add` needed:
   ```bash
-  rustup target add wasm32-unknown-unknown
+  rustup show   # optional: forces the install now instead of on first use
   ```
 - The Dioxus CLI, pinned to the version this repo is tested against
-  (0.6.3). Recommended via `cargo-binstall` (fetches a prebuilt binary —
+  (0.7.10). Recommended via `cargo-binstall` (fetches a prebuilt binary —
   compiling `dioxus-cli` from source takes 10+ minutes):
   ```bash
   cargo install cargo-binstall   # one-time
-  cargo binstall dioxus-cli --version 0.6.3 --locked
+  cargo binstall dioxus-cli --version 0.7.10 --locked
   ```
   Or, if you'd rather compile it yourself:
   ```bash
-  cargo install dioxus-cli --version 0.6.3 --locked
+  cargo install dioxus-cli --version 0.7.10 --locked
   ```
 
 Then, from this project folder:
