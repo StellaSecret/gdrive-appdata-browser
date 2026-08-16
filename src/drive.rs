@@ -8,14 +8,42 @@ use serde::{Deserialize, Serialize};
 
 const API_BASE: &str = "https://www.googleapis.com/drive/v3";
 
-fn files_list_url() -> String {
-    format!(
-        "{API_BASE}/files?spaces=appDataFolder&fields=files(id,name,modifiedTime,size)&pageSize=100"
-    )
+/// Builds the files.list URL for one page of the appDataFolder listing.
+/// `nextPageToken` must be explicitly requested in the `fields` mask (Drive's
+/// partial-response API omits anything not listed there, including the
+/// pagination token itself) or pagination silently breaks even though the
+/// token would otherwise be present in the full response.
+fn files_list_url(page_token: Option<&str>) -> String {
+    match page_token {
+        Some(token) => format!(
+            "{API_BASE}/files?spaces=appDataFolder&fields=nextPageToken,files(id,name,modifiedTime,size)&pageSize=1000&pageToken={}",
+            urlencoding::encode(token)
+        ),
+        None => format!(
+            "{API_BASE}/files?spaces=appDataFolder&fields=nextPageToken,files(id,name,modifiedTime,size)&pageSize=1000"
+        ),
+    }
 }
 
-fn revisions_list_url(file_id: &str) -> String {
-    format!("{API_BASE}/files/{file_id}/revisions?fields=revisions(id,modifiedTime,size)")
+fn extract_next_page_token(body: &serde_json::Value) -> Option<String> {
+    body.get("nextPageToken")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string())
+}
+
+/// Builds the revisions.list URL for one page of a file's revision
+/// history. Same nextPageToken-in-fields-mask requirement as
+/// files_list_url - see that function's doc comment.
+fn revisions_list_url(file_id: &str, page_token: Option<&str>) -> String {
+    match page_token {
+        Some(token) => format!(
+            "{API_BASE}/files/{file_id}/revisions?fields=nextPageToken,revisions(id,modifiedTime,size)&pageSize=1000&pageToken={}",
+            urlencoding::encode(token)
+        ),
+        None => format!(
+            "{API_BASE}/files/{file_id}/revisions?fields=nextPageToken,revisions(id,modifiedTime,size)&pageSize=1000"
+        ),
+    }
 }
 
 fn revision_media_url(file_id: &str, revision_id: &str) -> String {
@@ -69,23 +97,77 @@ async fn get_json(url: &str, token: &str) -> Result<serde_json::Value, String> {
     Ok(body)
 }
 
+/// appDataFolder realistically holds a handful of files (this is a hidden
+/// per-app storage bucket, not general Drive), so this cap exists purely
+/// as a safety net against Google's own documented edge case where
+/// `nextPageToken` can occasionally persist even when `files` comes back
+/// empty (see https://issuetracker.google.com/issues/406305173) - without
+/// a cap, a client hitting that bug would loop forever instead of
+/// eventually surfacing an error. 50 pages * 1000 per page is far beyond
+/// any realistic appDataFolder size.
+const MAX_LIST_PAGES: usize = 50;
+
 pub async fn list_appdata_files(token: &str) -> Result<Vec<DriveFile>, String> {
-    let body = get_json(&files_list_url(), token).await?;
-    let files: Vec<DriveFile> =
-        serde_json::from_value(body.get("files").cloned().unwrap_or(serde_json::json!([])))
-            .map_err(|e| format!("failed to parse files: {e}"))?;
-    Ok(files)
+    let mut all_files = Vec::new();
+    let mut page_token: Option<String> = None;
+
+    for _ in 0..MAX_LIST_PAGES {
+        let url = files_list_url(page_token.as_deref());
+        let body = get_json(&url, token).await?;
+
+        let files: Vec<DriveFile> =
+            serde_json::from_value(body.get("files").cloned().unwrap_or(serde_json::json!([])))
+                .map_err(|e| format!("failed to parse files: {e}"))?;
+        all_files.extend(files);
+
+        page_token = extract_next_page_token(&body);
+        if page_token.is_none() {
+            return Ok(all_files);
+        }
+    }
+
+    Err(format!(
+        "appDataFolder listing did not terminate after {MAX_LIST_PAGES} pages \
+         ({} files collected so far) - this is unexpected and may indicate \
+         a Drive API issue rather than a real amount of data.",
+        all_files.len()
+    ))
 }
 
 pub async fn list_revisions(token: &str, file_id: &str) -> Result<Vec<DriveRevision>, String> {
-    let body = get_json(&revisions_list_url(file_id), token).await?;
-    let revisions: Vec<DriveRevision> = serde_json::from_value(
-        body.get("revisions")
-            .cloned()
-            .unwrap_or(serde_json::json!([])),
-    )
-    .map_err(|e| format!("failed to parse revisions: {e}"))?;
-    Ok(revisions)
+    // Note: even with full pagination, Google's own docs warn revisions.list
+    // "might be incomplete for files with a large revision history... older
+    // revisions might be omitted" - a caveat about Drive's server-side
+    // behavior, not something a client can fully work around. Irrelevant in
+    // practice for a small JSON backup file's handful of revisions, but not
+    // something this fix can claim to guarantee away for every file type.
+    let mut all_revisions = Vec::new();
+    let mut page_token: Option<String> = None;
+
+    for _ in 0..MAX_LIST_PAGES {
+        let url = revisions_list_url(file_id, page_token.as_deref());
+        let body = get_json(&url, token).await?;
+
+        let revisions: Vec<DriveRevision> = serde_json::from_value(
+            body.get("revisions")
+                .cloned()
+                .unwrap_or(serde_json::json!([])),
+        )
+        .map_err(|e| format!("failed to parse revisions: {e}"))?;
+        all_revisions.extend(revisions);
+
+        page_token = extract_next_page_token(&body);
+        if page_token.is_none() {
+            return Ok(all_revisions);
+        }
+    }
+
+    Err(format!(
+        "revisions listing for file {file_id} did not terminate after {MAX_LIST_PAGES} pages \
+         ({} revisions collected so far) - this is unexpected and may indicate \
+         a Drive API issue rather than a real amount of data.",
+        all_revisions.len()
+    ))
 }
 
 /// Downloads a specific revision's raw bytes.
@@ -133,20 +215,63 @@ mod tests {
     use super::*;
 
     #[test]
-    fn files_list_url_targets_appdata_space() {
-        let url = files_list_url();
+    fn files_list_url_without_token_targets_appdata_space() {
+        let url = files_list_url(None);
         assert!(url.starts_with(API_BASE));
         assert!(url.contains("spaces=appDataFolder"));
-        assert!(url.contains("fields=files(id,name,modifiedTime,size)"));
+        assert!(url.contains("fields=nextPageToken,files(id,name,modifiedTime,size)"));
+        assert!(!url.contains("pageToken="));
+    }
+
+    #[test]
+    fn files_list_url_requests_nextpagetoken_in_fields_mask() {
+        // Drive's partial-response `fields` param omits anything not
+        // listed, including nextPageToken itself - without this, pages
+        // beyond the first would be silently unreachable even though the
+        // API would otherwise have more results to give.
+        let url = files_list_url(None);
+        assert!(url.contains("fields=nextPageToken,"));
+    }
+
+    #[test]
+    fn files_list_url_with_token_appends_encoded_page_token() {
+        let url = files_list_url(Some("abc/def+ghi=="));
+        assert!(url.contains("pageToken=abc%2Fdef%2Bghi%3D%3D"));
+    }
+
+    #[test]
+    fn extract_next_page_token_present() {
+        let body = serde_json::json!({"nextPageToken": "abc123", "files": []});
+        assert_eq!(extract_next_page_token(&body), Some("abc123".to_string()));
+    }
+
+    #[test]
+    fn extract_next_page_token_absent_means_last_page() {
+        let body = serde_json::json!({"files": []});
+        assert_eq!(extract_next_page_token(&body), None);
     }
 
     #[test]
     fn revisions_list_url_includes_file_id() {
-        let url = revisions_list_url("FILE123");
+        let url = revisions_list_url("FILE123", None);
         assert_eq!(
             url,
-            format!("{API_BASE}/files/FILE123/revisions?fields=revisions(id,modifiedTime,size)")
+            format!(
+                "{API_BASE}/files/FILE123/revisions?fields=nextPageToken,revisions(id,modifiedTime,size)&pageSize=1000"
+            )
         );
+    }
+
+    #[test]
+    fn revisions_list_url_requests_nextpagetoken_in_fields_mask() {
+        let url = revisions_list_url("FILE123", None);
+        assert!(url.contains("fields=nextPageToken,"));
+    }
+
+    #[test]
+    fn revisions_list_url_with_token_appends_encoded_page_token() {
+        let url = revisions_list_url("FILE123", Some("tok/en+="));
+        assert!(url.contains("pageToken=tok%2Fen%2B%3D"));
     }
 
     #[test]
