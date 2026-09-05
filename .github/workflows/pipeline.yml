@@ -40,7 +40,7 @@ jobs:
         # end result, but two toolchain downloads and nothing in the
         # workflow file actually saying why. Being explicit here avoids
         # both problems. If you bump rust-toolchain.toml, bump this too.
-        uses: dtolnay/rust-toolchain@1.91.0
+        uses: dtolnay/rust-toolchain@1.120.0
         with:
           components: clippy, rustfmt
 
@@ -80,7 +80,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: dtolnay/rust-toolchain@1.91.0
+      - uses: dtolnay/rust-toolchain@1.120.0
 
       - uses: Swatinem/rust-cache@v2
 
@@ -137,7 +137,7 @@ jobs:
       - name: Install Rust with wasm32 target
         # See the matching comment in the unit-tests job above - pinned
         # explicitly rather than relying on @stable + implicit override.
-        uses: dtolnay/rust-toolchain@1.91.0
+        uses: dtolnay/rust-toolchain@1.120.0
         with:
           targets: wasm32-unknown-unknown
 
