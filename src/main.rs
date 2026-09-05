@@ -544,6 +544,14 @@ mod tests {
     }
 
     #[test]
+    fn preset_icon_matches_known_projects_and_falls_back() {
+        assert!(preset_icon("PeopleModeler").is_some());
+        assert!(preset_icon("AsthmaTrack").is_some());
+        assert!(preset_icon("CVGenerator").is_some());
+        assert!(preset_icon("Unknown").is_none());
+    }
+
+    #[test]
     fn filter_available_presets_skips_none() {
         let raw: &[(&str, Option<&str>)] = &[("NoSecretSet", None)];
         assert_eq!(filter_available_presets(raw), Vec::<(&str, &str)>::new());
@@ -580,6 +588,12 @@ mod tests {
     }
 
     #[test]
+    fn avatar_color_matches_exact_hue() {
+        assert_eq!(avatar_color("PeopleModeler"), "hsl(245, 55%, 42%)");
+        assert_eq!(avatar_color("AsthmaTrack"), "hsl(27, 55%, 42%)");
+    }
+
+    #[test]
     fn avatar_color_produces_valid_hsl() {
         let color = avatar_color("AsthmaTrack");
         assert!(color.starts_with("hsl("));
@@ -592,5 +606,15 @@ mod tests {
         assert_eq!(avatar_initials("AsthmaTrack"), "AS");
         assert_eq!(avatar_initials("x"), "X");
         assert_eq!(avatar_initials(""), "");
+    }
+
+    #[test]
+    fn revision_id_or_id_returns_file_id() {
+        let rev = DriveRevision {
+            id: "rev-123".to_string(),
+            modified_time: None,
+            size: None,
+        };
+        assert_eq!(rev.revision_id_or_id(), "rev-123");
     }
 }

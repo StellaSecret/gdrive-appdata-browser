@@ -1,9 +1,10 @@
 name: Pipeline
 
-# Single linear pipeline: unit tests -> build wasm bundle -> e2e smoke
-# tests -> deploy to GitHub Pages -> post-deploy smoke check. The wasm
-# bundle is built exactly once and that same artifact is reused for both
-# the e2e job and the Pages deployment - no duplicate builds.
+# Single linear pipeline: unit tests & mutation tests run in parallel ->
+# build wasm bundle -> e2e smoke tests -> deploy to GitHub Pages ->
+# post-deploy smoke check. The wasm bundle is built exactly once and that
+# same artifact is reused for both the e2e job and the Pages deployment -
+# no duplicate builds.
 #
 # Deploy only runs for pushes to `main`, or a manual run (workflow_dispatch)
 # on `main` (e.g. to re-deploy without an empty commit). PRs stop after the
@@ -73,9 +74,62 @@ jobs:
 
           cargo audit
 
+  mutation-tests:
+    name: Mutation tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: dtolnay/rust-toolchain@1.91.0
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Install cargo-mutants
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-mutants
+
+      - name: Run mutation tests
+        id: mutants
+        # The only files with unit tests are src/main.rs and src/drive.rs;
+        # gis.rs/browser.rs are browser/web-glue with no test surface.
+        # exclude_re covers mutants that can't be killed without a bigger
+        # test bed: the main() entry stub, the Dioxus UI components, and the
+        # async Drive API functions (they make real HTTP calls through
+        # gloo-net). cargo-mutants exits non-zero when any mutant survives.
+        run: |
+          cargo mutants -f src/main.rs -f src/drive.rs \
+            --no-times --in-place --timeout 300 \
+            --exclude-re '(in FileCard|in RevisionRow|replace main|get_json|list_appdata_files|list_revisions|download_revision|delete_revision)' \
+            && ec=0 || ec=$?
+          echo "Caught $(wc -l < mutants.out/caught.txt 2>/dev/null || echo 0), missed $(wc -l < mutants.out/missed.txt 2>/dev/null || echo 0), unviable $(wc -l < mutants.out/unviable.txt 2>/dev/null || echo 0)"
+          echo "fatal=$ec" >> "$GITHUB_OUTPUT"
+
+      - name: Mutation test summary
+        if: always()
+        run: |
+          {
+            echo "## Mutation Testing"
+            echo ""
+            echo "**$(wc -l < mutants.out/caught.txt 2>/dev/null || echo 0) caught / $(wc -l < mutants.out/missed.txt 2>/dev/null || echo 0) missed / $(wc -l < mutants.out/unviable.txt 2>/dev/null || echo 0) unviable**"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: mutants
+          path: mutants.out
+          retention-days: 30
+
+      - name: Fail if mutations missed
+        if: steps.mutants.outputs.fatal != '0'
+        run: |
+          echo "cargo-mutants found missed/timeout mutants - exiting"
+          exit ${{ steps.mutants.outputs.fatal }}
+
   build:
     name: Build WASM bundle
-    needs: unit-tests
+    needs: [unit-tests, mutation-tests]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
