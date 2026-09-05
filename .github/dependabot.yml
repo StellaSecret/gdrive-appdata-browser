@@ -30,3 +30,9 @@ updates:
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 10
+    # The dtolnay/rust-toolchain action tag is a Rust version number that
+    # must stay in sync with rust-toolchain.toml (see the note in
+    # pipeline.yml); dependabot bumps it on its own schedule and has opened
+    # PRs against releases that don't exist yet, which break CI.
+    ignore:
+      - dependency-name: "dtolnay/rust-toolchain"
