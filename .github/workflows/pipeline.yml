@@ -76,6 +76,7 @@ jobs:
 
   mutation-tests:
     name: Mutation tests
+    needs: [unit-tests]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -129,7 +130,7 @@ jobs:
 
   build:
     name: Build WASM bundle
-    needs: [unit-tests, mutation-tests]
+    needs: [unit-tests]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -281,7 +282,7 @@ jobs:
 
   deploy:
     name: Deploy to GitHub Pages
-    needs: e2e
+    needs: [e2e, mutation-tests]
     if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     permissions:

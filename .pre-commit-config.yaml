@@ -41,3 +41,14 @@ repos:
         language: system
         types: [rust]
         pass_filenames: false
+
+      - id: check-no-mutants-markers
+        name: check no cargo-mutants markers
+        description: >
+          Blocks the commit if a "changed by cargo-mutants" marker is found in
+          staged Rust code, i.e. a mutation that cargo-mutants failed to
+          restore and would otherwise be committed instead of the original
+          logic.
+        entry: scripts/check_mutants_marker.sh
+        language: script
+        types: [rust]
