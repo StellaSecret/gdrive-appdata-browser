@@ -37,6 +37,7 @@ const KNOWN_PROJECTS: &[(&str, Option<&str>)] = &[
         "CVGenerator",
         option_env!("GOOGLE_WEB_CLIENT_ID_CVGENERATOR"),
     ),
+    ("SREAudit", option_env!("GOOGLE_WEB_CLIENT_ID_SREAUDIT")),
 ];
 
 // Preset icons, bundled via Dioxus's asset! macro (see
@@ -45,12 +46,14 @@ const KNOWN_PROJECTS: &[(&str, Option<&str>)] = &[
 const PEOPLEMODELER_ICON: Asset = asset!("/assets/icons/peoplemodeler.svg");
 const ASTHMATRACK_ICON: Asset = asset!("/assets/icons/asthmatrack.png");
 const CVGENERATOR_ICON: Asset = asset!("/assets/icons/cvgenerator.svg");
+const SREAUDIT_ICON: Asset = asset!("/assets/icons/sreaudit.svg");
 
 fn preset_icon(name: &str) -> Option<Asset> {
     match name {
         "PeopleModeler" => Some(PEOPLEMODELER_ICON),
         "AsthmaTrack" => Some(ASTHMATRACK_ICON),
         "CVGenerator" => Some(CVGENERATOR_ICON),
+        "SREAudit" => Some(SREAUDIT_ICON),
         _ => None,
     }
 }
@@ -548,6 +551,7 @@ mod tests {
         assert!(preset_icon("PeopleModeler").is_some());
         assert!(preset_icon("AsthmaTrack").is_some());
         assert!(preset_icon("CVGenerator").is_some());
+        assert!(preset_icon("SREAudit").is_some());
         assert!(preset_icon("Unknown").is_none());
     }
 
