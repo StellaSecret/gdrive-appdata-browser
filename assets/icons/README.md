@@ -1,6 +1,8 @@
 # Icon assets
 
 - **`peoplemodeler.svg`** — provided directly as a ready-to-use SVG.
+- **`sreaudit.svg`** — provided directly as a ready-to-use SVG (reliability
+  shield with a monitoring pulse and an audit-pass badge).
 - **`asthmatrack.png`** — the source design was an HTML+Canvas generator
   (`scripts/asthmatrack-icon-generator.html`) meant to be opened in a
   browser and downloaded by hand. Since no headless browser or
