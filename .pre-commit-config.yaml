@@ -52,3 +52,14 @@ repos:
         entry: scripts/check_mutants_marker.sh
         language: script
         types: [rust]
+
+      - id: cargo-audit
+        name: cargo audit
+        description: >
+          Checks Cargo.lock against the RustSec advisory database for known
+          vulnerabilities and yanked crates. Requires `cargo install
+          cargo-audit --locked` once locally.
+        entry: cargo audit --deny warnings
+        language: system
+        files: ^Cargo\.lock$
+        pass_filenames: false
