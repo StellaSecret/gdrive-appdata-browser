@@ -14,10 +14,10 @@ on:
   push:
     branches: [main]
   pull_request:
+    branches: [main]
   workflow_dispatch:
 
-permissions:
-  contents: read
+permissions: {}
 
 concurrency:
   group: pipeline-${{ github.ref }}
@@ -27,6 +27,8 @@ jobs:
   unit-tests:
     name: Unit tests & lint
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v7
 
@@ -78,6 +80,8 @@ jobs:
     name: Mutation tests
     needs: [unit-tests]
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v7
 
@@ -137,6 +141,8 @@ jobs:
   supply-chain:
     name: Supply Chain (cargo-deny)
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v7
       - uses: EmbarkStudios/cargo-deny-action@v2
@@ -148,6 +154,8 @@ jobs:
     name: Build WASM bundle
     needs: [unit-tests]
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v7
 
@@ -256,6 +264,8 @@ jobs:
     name: E2E smoke tests
     needs: build
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     container:
       image: mcr.microsoft.com/playwright:v1.64.1-noble
     steps:
@@ -305,6 +315,9 @@ jobs:
     permissions:
       pages: write
       id-token: write
+    concurrency:
+      group: github-pages-deploy
+      cancel-in-progress: false
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
