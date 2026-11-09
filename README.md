@@ -102,7 +102,7 @@ npm test
 ## Quick sign-in presets (optional)
 
 If you personally maintain multiple projects (e.g. PeopleModeler,
-AsthmaTrack, CVGenerator), you can add one-click "quick sign-in" avatar buttons for each,
+ChroniTracker, CVGenerator), you can add one-click "quick sign-in" avatar buttons for each,
 so you don't have to paste a Client ID in manually every time. This is
 purely a personal convenience layered on top of the manual input — it
 never replaces it, and it degrades gracefully to nothing if unconfigured.
@@ -136,7 +136,7 @@ several projects.
    ```rust
    const KNOWN_PROJECTS: &[(&str, Option<&str>)] = &[
        ("PeopleModeler", option_env!("GOOGLE_WEB_CLIENT_ID_PEOPLEMODELER")),
-       ("AsthmaTrack", option_env!("GOOGLE_WEB_CLIENT_ID_ASTHMATRACK")),
+       ("ChroniTracker", option_env!("GOOGLE_WEB_CLIENT_ID_CHRONITRACKER")),
        ("YourProject", option_env!("GOOGLE_WEB_CLIENT_ID_YOURPROJECT")),
    ];
    ```

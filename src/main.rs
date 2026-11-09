@@ -30,8 +30,8 @@ const KNOWN_PROJECTS: &[(&str, Option<&str>)] = &[
         option_env!("GOOGLE_WEB_CLIENT_ID_PEOPLEMODELER"),
     ),
     (
-        "AsthmaTrack",
-        option_env!("GOOGLE_WEB_CLIENT_ID_ASTHMATRACK"),
+        "ChroniTracker",
+        option_env!("GOOGLE_WEB_CLIENT_ID_CHRONITRACKER"),
     ),
     (
         "CVGenerator",
@@ -44,14 +44,14 @@ const KNOWN_PROJECTS: &[(&str, Option<&str>)] = &[
 // assets/icons/README.md for provenance). Optional: a preset without a
 // matching entry here just falls back to the colored-initials badge.
 const PEOPLEMODELER_ICON: Asset = asset!("/assets/icons/peoplemodeler.svg");
-const ASTHMATRACK_ICON: Asset = asset!("/assets/icons/asthmatrack.png");
+const CHRONITRACKER_ICON: Asset = asset!("/assets/icons/chronitracker.png");
 const CVGENERATOR_ICON: Asset = asset!("/assets/icons/cvgenerator.svg");
 const SREAUDIT_ICON: Asset = asset!("/assets/icons/sreaudit.svg");
 
 fn preset_icon(name: &str) -> Option<Asset> {
     match name {
         "PeopleModeler" => Some(PEOPLEMODELER_ICON),
-        "AsthmaTrack" => Some(ASTHMATRACK_ICON),
+        "ChroniTracker" => Some(CHRONITRACKER_ICON),
         "CVGenerator" => Some(CVGENERATOR_ICON),
         "SREAudit" => Some(SREAUDIT_ICON),
         _ => None,
@@ -549,7 +549,7 @@ mod tests {
     #[test]
     fn preset_icon_matches_known_projects_and_falls_back() {
         assert!(preset_icon("PeopleModeler").is_some());
-        assert!(preset_icon("AsthmaTrack").is_some());
+        assert!(preset_icon("ChroniTracker").is_some());
         assert!(preset_icon("CVGenerator").is_some());
         assert!(preset_icon("SREAudit").is_some());
         assert!(preset_icon("Unknown").is_none());
@@ -574,14 +574,14 @@ mod tests {
         let raw: &[(&str, Option<&str>)] = &[
             ("PeopleModeler", Some("123.apps.googleusercontent.com")),
             ("NotConfigured", None),
-            ("AsthmaTrack", Some("456.apps.googleusercontent.com")),
+            ("ChroniTracker", Some("456.apps.googleusercontent.com")),
             ("AlsoUnset", Some("")),
         ];
         assert_eq!(
             filter_available_presets(raw),
             vec![
                 ("PeopleModeler", "123.apps.googleusercontent.com"),
-                ("AsthmaTrack", "456.apps.googleusercontent.com"),
+                ("ChroniTracker", "456.apps.googleusercontent.com"),
             ]
         );
     }
@@ -594,12 +594,12 @@ mod tests {
     #[test]
     fn avatar_color_matches_exact_hue() {
         assert_eq!(avatar_color("PeopleModeler"), "hsl(245, 55%, 42%)");
-        assert_eq!(avatar_color("AsthmaTrack"), "hsl(27, 55%, 42%)");
+        assert_eq!(avatar_color("ChroniTracker"), "hsl(247, 55%, 42%)");
     }
 
     #[test]
     fn avatar_color_produces_valid_hsl() {
-        let color = avatar_color("AsthmaTrack");
+        let color = avatar_color("ChroniTracker");
         assert!(color.starts_with("hsl("));
         assert!(color.ends_with(", 55%, 42%)"));
     }
@@ -607,7 +607,7 @@ mod tests {
     #[test]
     fn avatar_initials_takes_first_two_chars_uppercased() {
         assert_eq!(avatar_initials("PeopleModeler"), "PE");
-        assert_eq!(avatar_initials("AsthmaTrack"), "AS");
+        assert_eq!(avatar_initials("ChroniTracker"), "CH");
         assert_eq!(avatar_initials("x"), "X");
         assert_eq!(avatar_initials(""), "");
     }

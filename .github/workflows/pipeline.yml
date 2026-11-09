@@ -214,7 +214,7 @@ jobs:
           # simply omits that preset button. Add a new project by adding
           # both a repo secret here and a line in KNOWN_PROJECTS.
           GOOGLE_WEB_CLIENT_ID_PEOPLEMODELER: ${{ secrets.GOOGLE_WEB_CLIENT_ID_PEOPLEMODELER }}
-          GOOGLE_WEB_CLIENT_ID_ASTHMATRACK: ${{ secrets.GOOGLE_WEB_CLIENT_ID_ASTHMATRACK }}
+          GOOGLE_WEB_CLIENT_ID_CHRONITRACKER: ${{ secrets.GOOGLE_WEB_CLIENT_ID_CHRONITRACKER }}
           GOOGLE_WEB_CLIENT_ID_CVGENERATOR: ${{ secrets.GOOGLE_WEB_CLIENT_ID_CVGENERATOR }}
           GOOGLE_WEB_CLIENT_ID_SREAUDIT: ${{ secrets.GOOGLE_WEB_CLIENT_ID_SREAUDIT }}
         # --out-dir is passed explicitly rather than relying on Dioxus.toml's
